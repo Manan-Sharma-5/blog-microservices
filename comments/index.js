@@ -3,6 +3,7 @@ const { randomBytes } = require("crypto");
 const bodyParser = require("body-parser");
 const axios = require("axios");
 const cors = require("cors");
+const { type } = require("os");
 
 const app = express();
 
@@ -21,7 +22,7 @@ app.post("/posts/:id/comments", (req, res) => {
 
   const comments = commentsByPostId[req.params.id] || [];
 
-  comments.push({ id: commentId, content });
+  comments.push({ id: commentId, content, status: "pending" });
 
   commentsByPostId[req.params.id] = comments;
 
@@ -31,6 +32,7 @@ app.post("/posts/:id/comments", (req, res) => {
       id: commentId,
       content,
       postId: req.params.id,
+      status: "pending",
     },
   });
 
@@ -39,7 +41,24 @@ app.post("/posts/:id/comments", (req, res) => {
 
 app.post("/events", (req, res) => {
   console.log("Received Event", req.body.type);
-  res.send({});
+  const { type, data } = req.body;
+
+  if (type === "commentModerated") {
+    const { id, postId, status, content } = data;
+    const comments = commentsByPostId[postId];
+    const comment = comments.find((comment) => comment.id === id);
+    comment.status = status;
+
+    axios.post("http://localhost:4005/events", {
+      type: "CommentUpdated",
+      data: {
+        id,
+        postId,
+        status,
+        content,
+      },
+    });
+  }
 });
 
-app.listen(4001, () => console.log("Server running on port 4000"));
+app.listen(4001, () => console.log("Server running on port 4001"));
